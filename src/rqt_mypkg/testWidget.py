@@ -8,7 +8,6 @@ class TestWidget(QWidget):
         super(TestWidget, self).__init__()
         self.VBox = QVBoxLayout(self)
         self.VBox.setAlignment(Qt.AlignTop)
-        #self.addButtons()
         #self.VBox.addWidget(self.buttonWidget)
         tabs = MyTabWidget(self)
         self.VBox.addWidget(tabs)

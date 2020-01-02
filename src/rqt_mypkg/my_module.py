@@ -14,7 +14,6 @@ class MyPlugin(Plugin):
 
     def __init__(self, context):
         super(MyPlugin, self).__init__(context)
-        
         testWidget = TestWidget()
         context.add_widget(testWidget)
 
