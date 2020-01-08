@@ -6,6 +6,8 @@ from PyQt5.QtGui import QColor, QPalette, QPixmap, QCursor, QFont
 from time import sleep
 from functools import partial
 
+from pbd_interface import PandaPBDInterface
+
 class TestWidget(QWidget):
 
     def __init__(self, title="Test Widget"):
