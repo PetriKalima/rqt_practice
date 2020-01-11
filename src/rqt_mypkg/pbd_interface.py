@@ -2,12 +2,13 @@
 
 import rospy
 import copy
-#import panda_primitive as pp
-#import program_interpreter as interpreter
-#from panda_pbd.srv import EnableTeaching, EnableTeachingRequest
-#from panda_pbd.msg import UserSyncGoal, MoveToContactGoal, MoveToEEGoal
-#from panda_pbd.srv import MoveFingersRequest, ApplyForceFingersRequest
-#from sensor_msgs.msg import JointState
+import panda_primitive as pp
+import program_interpreter as interpreter
+from panda_pbd.srv import EnableTeaching, EnableTeachingRequest
+from panda_pbd.msg import UserSyncGoal, MoveToContactGoal, MoveToEEGoal
+from panda_pbd.srv import MoveFingersRequest, ApplyForceFingersRequest
+from sensor_msgs.msg import JointState
+
 
 
 class PandaPBDInterface(object):
@@ -54,7 +55,7 @@ class PandaPBDInterface(object):
 
         self.freeze()
 
-    '''
+    
     def initialize_program(self):
         # TODO: maybe enforce some check on the rest of the functions? to check for initialization
         while self.last_pose is None or self.last_gripper_width is None:
@@ -154,7 +155,7 @@ class PandaPBDInterface(object):
             self.last_pose = res.ee_pose
             self.relaxed = False
         return True
-    '''
+    
 
     def insert_move_to_ee(self):
         was_relaxed = self.relaxed
@@ -193,7 +194,7 @@ class PandaPBDInterface(object):
 
         if was_relaxed:
             self.relax()
-'''
+
     def insert_user_sync(self):
         goal = UserSyncGoal()
         goal.force_threshold = self.default_parameters['user_sync_default_force_threshold']
@@ -253,4 +254,3 @@ class PandaPBDInterface(object):
 
         self.interpreter.load_program(temp_program)
         return self.interpreter.execute_rest_of_program(one_shot_execution=True)
-'''

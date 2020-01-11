@@ -6,23 +6,49 @@ from PyQt5.QtGui import QColor, QPalette, QPixmap, QCursor, QFont
 from time import sleep
 from functools import partial
 
+from panda_pbd.msg import MoveToEEGoal
+
 from pbd_interface import PandaPBDInterface
+import panda_primitive as pp
 
 class TestWidget(QWidget):
 
     def __init__(self, title="Test Widget"):
         super(TestWidget, self).__init__()
         self.threadpool = QThreadPool()
+        self.programThreadPool = QThreadPool()
         self.VBox = QVBoxLayout(self)
         self.VBox.setAlignment(Qt.AlignTop)
         #self.VBox.addWidget(self.buttonWidget)
-        tabs = MyTabWidget(self)
-        self.VBox.addWidget(tabs)
-        self.addButtonActions(tabs)
-        
+        self.tabs = MyTabWidget(self)
+        self.VBox.addWidget(self.tabs)
+        self.addButtonActions(self.tabs)
+        self.addProgramButtonActions()
+        self.program = pp.PandaProgram()
+
+
+    def executeProgramAction(self, fn):
+        programWorker = ProgramWorker(fn)
+        self.programThreadPool.start(programWorker)
+
+    def addProgramButtonActions(self):
+        self.tabs.programPanel.programMenu.buttons[0].pressed.connect(self.addMoveToEE)
+
+    def addMoveToEE(self):
+        goal = MoveToEEGoal()
+        move_to_ee_primitive = pp.MoveToEE()
+        move_to_ee_primitive.set_parameter_container(goal)
+        self.program.insert_primitive(move_to_ee_primitive, [None, None])
+        print(self.program.primitives)
+        newItem = QTableWidgetItem("Move to EE")
+        table = self.tabs.programPanel.programTable.programTable
+        rowNum = table.rowCount()
+        if rowNum < len(self.program.primitives):
+            table.insertRow(rowNum - 1)
+            table.move(rowNum - 1, 0)
+        table.setItem(rowNum - 1, 0, newItem)
 
     def addButtonActions(self, tabs):
-        #print(self.testReturnToStart)
         tabs.buttons.buttons[0].pressed.connect(partial(self.workerAction, self.testReturnToStart))
         tabs.buttons.buttons[1].pressed.connect(partial(self.workerAction, self.testExecuteAction))
         tabs.buttons.buttons[2].pressed.connect(partial(self.workerAction, self.testRevertAction))
@@ -151,15 +177,28 @@ class ProgramPanel(QWidget):
     def __init__(self, parent):
         super(ProgramPanel, self).__init__(parent)
         self.layout = QHBoxLayout(self)
-        programTable = ProgramTable(self)
-        programMenu = ProgramMenu(self)
-        self.layout.addWidget(programTable)
-        self.layout.addWidget(programMenu)
+        self.programTable = ProgramTable(self)
+        self.programMenu = ProgramMenu(self)
+        self.layout.addWidget(self.programTable)
+        self.layout.addWidget(self.programMenu)
         #self.tablelayout = QVBoxLayout(self.layout)
         #self.tablelayout.addWidget(self.programTable)
         #self.layout.addWidget(self.tablelayout)
 
-    
+class ProgramWorker(QRunnable):
+
+    def __init__(self, fn, *args, **kwargs):
+        super(ProgramWorker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    @pyqtSlot()
+    def run(self):
+        '''
+        Run chosen function with given args and kwargs
+        '''
+        self.fn(*self.args, **self.kwargs)        
 
 
 class Worker(QRunnable):
