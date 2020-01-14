@@ -6,10 +6,12 @@ from PyQt5.QtGui import QColor, QPalette, QPixmap, QCursor, QFont
 from time import sleep
 from functools import partial
 
-from panda_pbd.msg import MoveToEEGoal
+from panda_pbd.msg import MoveToEEGoal, MoveToContactActionGoal
 
-from pbd_interface import PandaPBDInterface
-import panda_primitive as pp
+from panda_eup.pbd_interface import PandaPBDInterface
+import panda_eup.panda_primitive as pp
+#from pbd_interface import PandaPBDInterface
+#import panda_primitive as pp
 
 class TestWidget(QWidget):
 
@@ -24,8 +26,12 @@ class TestWidget(QWidget):
         self.VBox.addWidget(self.tabs)
         self.addButtonActions(self.tabs)
         self.addProgramButtonActions()
+        self.addSaveButtonAction()
         self.program = pp.PandaProgram()
 
+
+    def addSaveButtonAction(self):
+        self.tabs.programPanel.programTable.saveButton.pressed.connect(self.saveProgram)
 
     def executeProgramAction(self, fn):
         programWorker = ProgramWorker(fn)
@@ -33,21 +39,38 @@ class TestWidget(QWidget):
 
     def addProgramButtonActions(self):
         self.tabs.programPanel.programMenu.buttons[0].pressed.connect(self.addMoveToEE)
+        self.tabs.programPanel.programMenu.buttons[1].pressed.connect(self.addMoveToContact)
+
+    def saveProgram(self):
+        self.program.dump_to_file("~/rqt_ws/src/rqt_mypkg/rqt_practice/Resources", "testprogram.pkl")
 
     def addMoveToEE(self):
         goal = MoveToEEGoal()
         move_to_ee_primitive = pp.MoveToEE()
         move_to_ee_primitive.set_parameter_container(goal)
         self.program.insert_primitive(move_to_ee_primitive, [None, None])
-        print(self.program.primitives)
-        newItem = QTableWidgetItem("Move to EE")
+        #print(self.program.primitives)
         table = self.tabs.programPanel.programTable.programTable
+        self.insertToTable(table, "Move to EE")
+
+    def addMoveToContact(self):
+        goal = MoveToContactActionGoal()
+        move_to_contact_primitive = pp.MoveToContact()
+        move_to_contact_primitive.set_parameter_container(goal)
+        self.program.insert_primitive(move_to_contact_primitive, [None, None])
+        table = self.tabs.programPanel.programTable.programTable
+        self.insertToTable(table, "Move to contact")
+
+    def insertToTable(self, table, label):
+        newItem = QTableWidgetItem(label)
         rowNum = table.rowCount()
         if rowNum < len(self.program.primitives):
-            table.insertRow(rowNum - 1)
+            table.insertRow(rowNum)
             table.move(rowNum - 1, 0)
-        table.setItem(rowNum - 1, 0, newItem)
-
+            table.setItem(rowNum, 0, newItem)
+        else:    
+            table.setItem(rowNum - 1, 0, newItem)
+    
     def addButtonActions(self, tabs):
         tabs.buttons.buttons[0].pressed.connect(partial(self.workerAction, self.testReturnToStart))
         tabs.buttons.buttons[1].pressed.connect(partial(self.workerAction, self.testExecuteAction))
@@ -109,7 +132,7 @@ class MyTabWidget(QWidget):
         self.tabs = QTabWidget()
         self.tab1 = QWidget()
         self.tab2 = QWidget()
-        self.tabs.resize(300,200)
+        #self.tabs.resize(300,200)
         
         # Add tabs
         self.tabs.addTab(self.tab1,"Run Programs")
@@ -138,6 +161,9 @@ class ProgramTable(QWidget):
         self.createProgramTable()
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.programTable)
+        self.saveButton = QPushButton("Save Program")
+        self.saveButton.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.layout.addWidget(self.saveButton)
 
     def createProgramTable(self) :
         self.programTable = QTableWidget()
@@ -146,6 +172,7 @@ class ProgramTable(QWidget):
         newItem = QTableWidgetItem("test")
         #self.programTable.setItem(0, 0, newItem)
         self.programTable.move(0,0)
+    
 
 class ProgramMenu(QWidget):
 
