@@ -1,10 +1,12 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QFrame, QPushButton, QHBoxLayout, \
-QVBoxLayout, QScrollArea, QSizePolicy, QGroupBox, QApplication, QStackedWidget, QSlider, QGridLayout, QTabWidget, QTableWidget, QTableWidgetItem
+QVBoxLayout, QScrollArea, QSizePolicy, QGroupBox, QApplication, QStackedWidget, QSlider, QGridLayout, QTabWidget, QTableWidget, QTableWidgetItem, QLineEdit
 from PyQt5.QtCore import Qt, QObject, QRunnable, pyqtSignal, pyqtSlot, QSize, QThreadPool, pyqtProperty, QPropertyAnimation
 from PyQt5.QtGui import QColor, QPalette, QPixmap, QCursor, QFont
 
 from time import sleep
 from functools import partial
+import traceback
+import sys
 
 from panda_pbd.msg import MoveToEEGoal, MoveToContactActionGoal, UserSyncGoal
 from panda_pbd.srv import MoveFingersRequest, ApplyForceFingersRequest
@@ -31,14 +33,15 @@ class TestWidget(QWidget):
                               "Move fingers": (MoveFingersRequest, pp.MoveFingers),
                               "Apply force to fingers": (ApplyForceFingersRequest, pp.ApplyForceFingers)
                               }                    
-        self.addButtonActions(self.tabs)
+        self.addButtonActions()
         self.addProgramButtonActions()
-        self.addSaveButtonAction()
+        self.addTableButtonActions()
         self.program = pp.PandaProgram()
 
 
-    def addSaveButtonAction(self):
-        self.tabs.programPanel.programTable.saveButton.pressed.connect(self.saveProgram)
+    def addTableButtonActions(self):
+        self.tabs.programPanel.programTable.actionButtons.saveButton.pressed.connect(self.saveProgram)
+        self.tabs.programPanel.programTable.actionButtons.resetButton.pressed.connect(self.resetProgram)
 
     def executeProgramAction(self, fn):
         programWorker = ProgramWorker(fn)
@@ -52,7 +55,20 @@ class TestWidget(QWidget):
         self.tabs.programPanel.programMenu.buttons[4].pressed.connect(self.addApplyForceFingers)
 
     def saveProgram(self):
-        self.program.dump_to_file("~/rqt_ws/src/rqt_mypkg/rqt_practice/Resources", "testprogram.pkl")
+        inputField = self.tabs.programPanel.programTable.actionButtons.inputField
+        filename =  inputField.text()
+        if filename == '':
+            self.program.dump_to_file("~/rqt_ws/src/rqt_mypkg/rqt_practice/Resources", "testprogram.pkl")
+        else:
+             self.program.dump_to_file("~/rqt_ws/src/rqt_mypkg/rqt_practice/Resources", str(filename) + '.pkl')   
+        inputField.clear()     
+
+    def resetProgram(self):
+        self.program.primitives = []
+        table = self.tabs.programPanel.programTable.programTable
+        table.clear()
+        table.setRowCount(1)
+
 
     def addMoveToEE(self):
         goal = MoveToEEGoal()
@@ -81,9 +97,9 @@ class TestWidget(QWidget):
 
     def addMoveFingers(self):
         request = MoveFingersRequest()
-        request.width = 100
+        #request.width = 0.05
         move_fingers_primitive = pp.MoveFingers()
-        move_fingers_primitive.set_parameter_container(request)
+        #move_fingers_primitive.set_parameter_container(request)
         self.program.insert_primitive(move_fingers_primitive, [None, None])
         table = self.tabs.programPanel.programTable.programTable
         self.insertToTable(table, "Move fingers")    
@@ -105,36 +121,51 @@ class TestWidget(QWidget):
             table.setItem(rowNum, 0, newItem)
         else:    
             table.setItem(rowNum - 1, 0, newItem)
+
+    def changeButtonState(self):
+        for button in self.tabs.buttons.buttons:
+            state = button.isEnabled()
+            button.setEnabled(abs(state - 1))        
     
-    def addButtonActions(self, tabs):
-        tabs.buttons.buttons[0].pressed.connect(partial(self.workerAction, self.testReturnToStart))
-        tabs.buttons.buttons[1].pressed.connect(partial(self.workerAction, self.testExecuteAction))
-        tabs.buttons.buttons[2].pressed.connect(partial(self.workerAction, self.testRevertAction))
-        tabs.buttons.buttons[3].pressed.connect(partial(self.workerAction, self.testExecuteRest))
+    def addButtonActions(self):
+        self.tabs.buttons.buttons[0].pressed.connect(partial(self.workerAction, self.testReturnToStart))
+        self.tabs.buttons.buttons[1].pressed.connect(partial(self.workerAction, self.testExecuteAction))
+        self.tabs.buttons.buttons[2].pressed.connect(partial(self.workerAction, self.testRevertAction))
+        self.tabs.buttons.buttons[3].pressed.connect(partial(self.workerAction, self.testExecuteRest))
+
+    def printResult(self, result):
+        print(result)
 
     def workerAction(self, fn):
-        worker = Worker(fn)  
+        self.changeButtonState()
+        worker = Worker(fn)
+        worker.signals.result.connect(self.printResult)  
+        worker.signals.finished.connect(self.changeButtonState)
         self.threadpool.start(worker) 
 
     def testReturnToStart(self):
         print("Pretending to return to starting point")
-        sleep(10)
+        sleep(5)
         print("Return to start ended")
+        return "Sample result from testReturnToStart"
 
     def testExecuteAction(self):
         print("Pretending to execute an action")
-        sleep(10)
+        sleep(5)
         print("Execute action ended")
+        return "Sample result from testExecuteAction"
 
     def testRevertAction(self):
         print("Pretending to revert an action")
-        sleep(10)
-        print("Revert action ended")  
+        sleep(5)
+        print("Revert action ended")
+        return "Sample result from testRevertAction"  
 
     def testExecuteRest(self):
         print("Pretending to execute rest of the program")
-        sleep(10)
-        print("Execute rest ended")          
+        sleep(5)
+        print("Execute rest ended")  
+        return "Sample result from testExecuteRest"        
 
 
 class TestButtons(QWidget):
@@ -189,6 +220,20 @@ class MyTabWidget(QWidget):
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
+class TableActionButtons(QWidget):
+
+    def __init__(self, parent):
+        super(TableActionButtons, self).__init__(parent)
+        self.layout = QHBoxLayout(self)
+        self.saveButton = QPushButton("Save Program")
+        self.inputField = QLineEdit()
+        self.inputField.setPlaceholderText("Enter name for saved file")
+        self.resetButton = QPushButton("Reset Program")
+        self.saveButton.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.layout.addWidget(self.saveButton)
+        self.layout.addWidget(self.inputField)
+        self.layout.addWidget(self.resetButton)        
+
 class ProgramTable(QWidget):
 
     def __init__(self, parent):
@@ -196,16 +241,14 @@ class ProgramTable(QWidget):
         self.createProgramTable()
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.programTable)
-        self.saveButton = QPushButton("Save Program")
-        self.saveButton.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.layout.addWidget(self.saveButton)
+        self.actionButtons = TableActionButtons(self)
+        self.layout.addWidget(self.actionButtons)
+
 
     def createProgramTable(self) :
         self.programTable = QTableWidget()
         self.programTable.setRowCount(1)
         self.programTable.setColumnCount(1)
-        newItem = QTableWidgetItem("test")
-        #self.programTable.setItem(0, 0, newItem)
         self.programTable.move(0,0)
     
 
@@ -220,7 +263,7 @@ class ProgramMenu(QWidget):
         self.addProgramButtons()
 
     def addLabel(self):
-        titleText = QLabel("Create program")
+        titleText = QLabel("Add primitives for the program")
         titleText.setAlignment(Qt.AlignTop)
         self.layout.addWidget(titleText)  
 
@@ -263,6 +306,14 @@ class ProgramWorker(QRunnable):
         self.fn(*self.args, **self.kwargs)        
 
 
+class WorkerSignals(QObject):
+
+    finished = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+    progress = pyqtSignal(int)
+
+
 class Worker(QRunnable):
 
     def __init__(self, fn, *args, **kwargs):
@@ -270,10 +321,21 @@ class Worker(QRunnable):
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
+        self.signals = WorkerSignals()
 
     @pyqtSlot()
     def run(self):
         '''
         Run chosen function with given args and kwargs
         '''
-        self.fn(*self.args, **self.kwargs)
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)
+        finally:
+            self.signals.finished.emit()    
+
